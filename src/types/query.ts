@@ -1,0 +1,44 @@
+// The complete state of an analysis question
+export interface AnalysisQuestion {
+  blockA: EntityBlock;
+  relationship: SpatialRelationship;
+  blockC: EntityBlock;
+}
+
+export type EntityType = 'samples' | 'facilities' | 'waterBodies';
+
+export interface EntityBlock {
+  type: EntityType;
+  region?: RegionFilter;
+  sampleFilters?: SampleFilters;
+  facilityFilters?: FacilityFilters;
+  waterBodyFilters?: WaterBodyFilters;
+}
+
+export interface RegionFilter {
+  stateCode?: string;
+  countyCodes?: string[];
+  countySubdivisionURIs?: string[];
+}
+
+export interface SampleFilters {
+  substances?: string[];
+  materialTypes?: string[];
+  minConcentration?: number;
+  maxConcentration?: number;
+  unit?: string;
+}
+
+export interface FacilityFilters {
+  industryCodes?: string[];
+}
+
+export interface WaterBodyFilters {
+  waterTypes?: string[];
+  ftypes?: string[];
+}
+
+export interface SpatialRelationship {
+  type: 'near' | 'downstream' | 'upstream' | 'within';
+  hops?: number;
+}

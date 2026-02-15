@@ -1,0 +1,375 @@
+/* App Layout */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #1a365d;
+  color: white;
+  flex-shrink: 0;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.header-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.app-sidebar {
+  width: 380px;
+  min-width: 380px;
+  overflow-y: auto;
+  background: #f7fafc;
+  border-right: 1px solid #e2e8f0;
+  padding: 1rem;
+}
+
+/* Main Content */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.results-panel {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #e2e8f0;
+  background: #fff;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Query Editor */
+.query-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.question-preview {
+  padding: 0.75rem;
+  background: #ebf8ff;
+  border-radius: 6px;
+  border: 1px solid #bee3f8;
+}
+
+.question-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2b6cb0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.question-text {
+  font-size: 0.9rem;
+  color: #2d3748;
+  font-style: italic;
+}
+
+/* Block Cards */
+.block-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: white;
+}
+
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.block-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Entity Type Selector */
+.entity-type-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.entity-type-selector label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.entity-type-selector select {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+/* Filters */
+.filter-field {
+  margin-bottom: 0.5rem;
+}
+
+.filter-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #4a5568;
+  margin-bottom: 0.2rem;
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filter-field.half {
+  flex: 1;
+}
+
+.filter-field input[type="number"] {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+
+/* Region Selector */
+.region-selector {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.region-field {
+  margin-bottom: 0.5rem;
+}
+
+.region-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #4a5568;
+  margin-bottom: 0.2rem;
+}
+
+/* Relationship Selector */
+.relationship-selector {
+  background: #f0fff4;
+  border-color: #c6f6d5;
+}
+
+.relationship-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.relationship-content select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #c6f6d5;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: white;
+}
+
+.relationship-desc {
+  font-size: 0.8rem;
+  color: #4a5568;
+}
+
+/* Block Actions */
+.block-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #3182ce;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+/* Query Actions */
+.query-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.btn-primary {
+  padding: 0.5rem 1.25rem;
+  background: #3182ce;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2b6cb0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  padding: 0.5rem 1.25rem;
+  background: #edf2f7;
+  color: #4a5568;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+/* Pipeline Status */
+.pipeline-status h3 {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem;
+  color: #2d3748;
+}
+
+.pipeline-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  padding: 0.2rem 0;
+}
+
+.step-icon {
+  font-size: 0.9rem;
+}
+
+.step-count {
+  color: #718096;
+  font-size: 0.75rem;
+}
+
+.step-running {
+  color: #3182ce;
+}
+
+.step-failed {
+  color: #e53e3e;
+}
+
+/* Pipeline Messages */
+.pipeline-message {
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.pipeline-empty {
+  background: #fefcbf;
+  border: 1px solid #ecc94b;
+  color: #744210;
+}
+
+.pipeline-error {
+  background: #fed7d7;
+  border: 1px solid #fc8181;
+  color: #9b2c2c;
+}
+
+.pipeline-error pre {
+  font-size: 0.75rem;
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.result-summary {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #2d3748;
+}
+
+/* React Select overrides */
+.rs__control {
+  min-height: 32px !important;
+  font-size: 0.85rem;
+}
+
+.rs__value-container {
+  padding: 0 6px !important;
+}
+
+.rs__indicator {
+  padding: 4px !important;
+}
+
+.rs__multi-value {
+  font-size: 0.8rem;
+}
+
+/* Map Popup */
+.map-popup {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.map-popup strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}

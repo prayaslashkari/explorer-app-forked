@@ -1,0 +1,49 @@
+import { useMemo } from 'react';
+import type { PipelineResult } from '../engine/executor';
+import type { MapFeature } from '../types/map';
+import {
+  transformSamplesToFeatures,
+  transformFacilitiesToFeatures,
+  transformWaterBodiesToFeatures,
+  transformRegionBoundaries,
+} from '../engine/resultTransformer';
+
+export interface MapLayerData {
+  samples: MapFeature[];
+  facilities: MapFeature[];
+  waterBodies: MapFeature[];
+  regionBoundaries: MapFeature[];
+}
+
+export function useMapLayers(result: PipelineResult | null): MapLayerData {
+  return useMemo(() => {
+    const empty: MapLayerData = {
+      samples: [],
+      facilities: [],
+      waterBodies: [],
+      regionBoundaries: [],
+    };
+
+    if (!result || result.status !== 'success') return empty;
+
+    const data = result.data;
+
+    const targetRows = data['FIND_TARGET_ENTITIES'] || [];
+    const anchorRows = data['GET_ANCHOR_DETAILS'] || [];
+    const boundaryRows = data['GET_REGION_BOUNDARIES'] || [];
+
+    // Determine what types came back by checking row shapes
+    const allRows = [...targetRows, ...anchorRows];
+
+    const sampleRows = allRows.filter((r) => r.spWKT);
+    const facilityRows = allRows.filter((r) => r.facWKT);
+    const waterBodyRows = allRows.filter((r) => r.wbWKT);
+
+    return {
+      samples: transformSamplesToFeatures(sampleRows),
+      facilities: transformFacilitiesToFeatures(facilityRows),
+      waterBodies: transformWaterBodiesToFeatures(waterBodyRows),
+      regionBoundaries: transformRegionBoundaries(boundaryRows),
+    };
+  }, [result]);
+}
