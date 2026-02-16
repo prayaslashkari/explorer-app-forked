@@ -5,7 +5,7 @@ import { s2CellsToValuesString } from '../utils/s2cells';
 import { buildFacilityS2Query, buildFacilityDetailsQuery } from './templates/facilities';
 import { buildSampleS2Query, buildSampleRetrievalQuery } from './templates/samples';
 import { buildWaterBodyS2Query, buildWaterBodyRetrievalQuery } from './templates/waterBodies';
-import { buildRegionFilterQuery, buildNearExpansionQuery, buildRegionBoundaryQuery } from './templates/spatial';
+import { buildRegionFilterQuery, buildStrictRegionFilterQuery, buildNearExpansionQuery, buildRegionBoundaryQuery } from './templates/spatial';
 import { buildDownstreamTraceQuery, buildUpstreamTraceQuery } from './templates/hydrology';
 
 export type PipelineStepType =
@@ -29,6 +29,7 @@ export interface PipelineStep {
 export interface PipelineContext {
   question: AnalysisQuestion;
   s2Cells: string[];
+  anchorS2Cells: string[];
   results: Record<string, SparqlRow[]>;
 }
 
@@ -37,7 +38,7 @@ function getS2Step(block: EntityBlock): PipelineStep {
     case 'facilities':
       return {
         type: 'GET_S2_FOR_ANCHOR',
-        endpoint: 'fiokg',
+        endpoint: 'federation',
         description: 'Finding S2 cells containing matching facilities',
         buildQuery: () => buildFacilityS2Query(block.facilityFilters),
       };
@@ -66,6 +67,18 @@ function filterS2ToRegionStep(regionCode: string): PipelineStep {
     buildQuery: (ctx) => {
       const vals = s2CellsToValuesString(ctx.s2Cells);
       return buildRegionFilterQuery(vals, regionCode);
+    },
+  };
+}
+
+function strictRegionFilterStep(regionCode: string): PipelineStep {
+  return {
+    type: 'FILTER_S2_POST_SPATIAL',
+    endpoint: 'spatialkg',
+    description: `Filtering to region ${regionCode}`,
+    buildQuery: (ctx) => {
+      const vals = s2CellsToValuesString(ctx.s2Cells);
+      return buildStrictRegionFilterQuery(vals, regionCode);
     },
   };
 }
@@ -145,7 +158,7 @@ function getDetailsStep(block: EntityBlock): PipelineStep {
         type: 'GET_ANCHOR_DETAILS',
         endpoint: 'fiokg',
         description: 'Getting facility details for map',
-        buildQuery: (ctx) => buildFacilityDetailsQuery(block.facilityFilters, ctx.s2Cells),
+        buildQuery: (ctx) => buildFacilityDetailsQuery(block.facilityFilters, ctx.anchorS2Cells),
       };
     case 'samples':
       return {
@@ -153,7 +166,7 @@ function getDetailsStep(block: EntityBlock): PipelineStep {
         endpoint: 'sawgraph',
         description: 'Getting sample details for map',
         buildQuery: (ctx) => {
-          const vals = s2CellsToValuesString(ctx.s2Cells);
+          const vals = s2CellsToValuesString(ctx.anchorS2Cells);
           return buildSampleRetrievalQuery(vals, block.sampleFilters);
         },
       };
@@ -163,7 +176,7 @@ function getDetailsStep(block: EntityBlock): PipelineStep {
         endpoint: 'spatialkg',
         description: 'Getting water body details for map',
         buildQuery: (ctx) => {
-          const vals = s2CellsToValuesString(ctx.s2Cells);
+          const vals = s2CellsToValuesString(ctx.anchorS2Cells);
           return buildWaterBodyRetrievalQuery(vals, block.waterBodyFilters);
         },
       };
@@ -185,15 +198,18 @@ export function planPipeline(question: AnalysisQuestion): PipelineStep[] {
     // Start from Block C (the anchor entity), find Block A nearby
     steps.push(getS2Step(blockC));
 
+    // Filter to region BEFORE expanding to keep S2 cell count manageable
     const regionCodeC = getRegionCode(blockC);
-    if (regionCodeC) steps.push(filterS2ToRegionStep(regionCodeC));
+    const regionCodeA = getRegionCode(blockA);
+    const preExpandRegion = regionCodeC || regionCodeA;
+    if (preExpandRegion) steps.push(filterS2ToRegionStep(preExpandRegion));
 
     steps.push(expandNearStep());
 
-    const regionCodeA = getRegionCode(blockA);
+    // Also filter AFTER expanding to the target region
     if (regionCodeA) {
       steps.push({
-        ...filterS2ToRegionStep(regionCodeA),
+        ...strictRegionFilterStep(regionCodeA),
         type: 'FILTER_S2_POST_SPATIAL',
       });
     }
@@ -204,17 +220,17 @@ export function planPipeline(question: AnalysisQuestion): PipelineStep[] {
     // Start from Block C (facilities), trace downstream, find Block A
     steps.push(getS2Step(blockC));
 
+    // Filter to region BEFORE tracing to keep S2 cell count manageable
     const regionCodeC = getRegionCode(blockC);
-    if (regionCodeC) steps.push(filterS2ToRegionStep(regionCodeC));
+    const regionCodeA = getRegionCode(blockA);
+    const preTraceRegion = regionCodeC || regionCodeA;
+    if (preTraceRegion) steps.push(filterS2ToRegionStep(preTraceRegion));
 
     steps.push(traceDownstreamStep());
 
-    const regionCodeA = getRegionCode(blockA);
+    // Also filter AFTER tracing to the target region (strict, no expansion)
     if (regionCodeA) {
-      steps.push({
-        ...filterS2ToRegionStep(regionCodeA),
-        type: 'FILTER_S2_POST_SPATIAL',
-      });
+      steps.push(strictRegionFilterStep(regionCodeA));
     }
 
     steps.push(findEntitiesStep(blockA));

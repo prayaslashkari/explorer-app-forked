@@ -12,7 +12,9 @@ export function FacilityFilters({ value, onChange }: FacilityFiltersProps) {
 
   const industryOptions = industries.map((i) => ({
     value: i.code,
-    label: `${i.code} - ${i.label}`,
+    label: i.code.length <= 4
+      ? `${i.code} - ${i.label} (Group)`
+      : `${i.code} - ${i.label}`,
   }));
 
   const selectedIndustries = industryOptions.filter((o) =>

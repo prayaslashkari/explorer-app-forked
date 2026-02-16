@@ -46,7 +46,7 @@ export async function executePipeline(
   question: AnalysisQuestion,
   onProgress: (progress: StepProgress) => void
 ): Promise<PipelineResult> {
-  const context: PipelineContext = { question, s2Cells: [], results: {} };
+  const context: PipelineContext = { question, s2Cells: [], anchorS2Cells: [], results: {} };
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -64,6 +64,11 @@ export async function executePipeline(
       // If this step produces S2 cells, update context
       if (S2_PRODUCING_STEPS.has(step.type) && results.length > 0 && results[0].s2cell) {
         context.s2Cells = results.map((r) => shortenS2URI(r.s2cell));
+
+        // Save anchor S2 cells after the initial steps (before spatial expansion/tracing)
+        if (step.type === 'GET_S2_FOR_ANCHOR' || step.type === 'FILTER_S2_TO_REGION') {
+          context.anchorS2Cells = [...context.s2Cells];
+        }
       }
 
       context.results[step.type] = results;

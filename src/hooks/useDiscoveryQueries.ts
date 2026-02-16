@@ -17,11 +17,27 @@ export function useIndustries() {
       const rows = await executeSparql('fiokg', buildDiscoverIndustriesQuery());
       if (rows.length === 0) return FALLBACK_NAICS;
       const seen = new Set<string>();
-      const deduped: NaicsIndustry[] = [];
+      const result: NaicsIndustry[] = [];
+
+      // First pass: collect unique group codes
+      for (const r of rows) {
+        const gc = r.groupCode;
+        if (gc && !seen.has(gc)) {
+          seen.add(gc);
+          result.push({
+            code: gc,
+            label: r.groupLabel || gc,
+            groupCode: gc,
+            groupLabel: r.groupLabel,
+          });
+        }
+      }
+
+      // Second pass: collect unique individual codes
       for (const r of rows) {
         if (!seen.has(r.code)) {
           seen.add(r.code);
-          deduped.push({
+          result.push({
             code: r.code,
             label: r.label,
             groupCode: r.groupCode,
@@ -29,7 +45,10 @@ export function useIndustries() {
           });
         }
       }
-      return deduped;
+
+      // Sort: groups first (shorter codes), then specifics
+      result.sort((a, b) => a.code.length - b.code.length || a.code.localeCompare(b.code));
+      return result;
     },
     staleTime: Infinity,
     retry: 1,

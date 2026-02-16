@@ -14,6 +14,19 @@ export function buildRegionFilterQuery(
   `;
 }
 
+export function buildStrictRegionFilterQuery(
+  s2ValuesString: string,
+  regionCode: string
+): string {
+  return `
+    ${PREFIXES}
+    SELECT DISTINCT ?s2cell WHERE {
+      VALUES ?s2cell { ${s2ValuesString} }
+      ?s2cell spatial:connectedTo kwgr:administrativeRegion.USA.${regionCode} .
+    }
+  `;
+}
+
 export function buildNearExpansionQuery(s2ValuesString: string): string {
   return `
     ${PREFIXES}
