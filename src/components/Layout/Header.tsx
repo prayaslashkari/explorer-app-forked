@@ -10,12 +10,12 @@ export function Header() {
         <button className='header-logo' onClick={goToDashboard}>
           <img src={logo} alt='Sawgraph Explorer' width='80' />
         </button>
-        {currentView === 'editor' && (
-          <button className='header-back' onClick={goToDashboard}>
-            &larr; Dashboard
-          </button>
-        )}
       </div>
+      {currentView === 'editor' && (
+        <button className='header-back' onClick={goToDashboard}>
+          &larr; Back to Dashboard
+        </button>
+      )}
     </header>
   );
 }

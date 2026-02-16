@@ -9,6 +9,7 @@
 .app-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0.6rem var(--space-xl);
   background: #fff;
   color: var(--color-gray-800);
@@ -194,7 +195,7 @@
   flex: 1;
 }
 
-.filter-field input[type="number"] {
+.filter-field input[type='number'] {
   width: 100%;
   padding: 0.35rem var(--space-sm);
   border: 1px solid var(--color-gray-300);
@@ -517,7 +518,9 @@
   border-radius: var(--radius-lg);
   padding: 1.25rem var(--space-xl);
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   box-shadow: var(--shadow-card);
 }
 
