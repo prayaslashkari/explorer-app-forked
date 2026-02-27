@@ -1,6 +1,7 @@
 import { Header } from './components/Layout/Header';
-import { Sidebar } from './components/Layout/Sidebar';
+import { AnalysisQuestionBar } from './components/Layout/AnalysisQuestionBar';
 import { MainContent } from './components/Layout/MainContent';
+import { EditModal } from './components/QueryEditor/EditModal';
 import { Dashboard } from './components/Dashboard/Dashboard';
 import { useQueryStore } from './store/queryStore';
 import './App.css';
@@ -14,10 +15,11 @@ function App() {
       {currentView === 'dashboard' ? (
         <Dashboard />
       ) : (
-        <div className="app-body">
-          <Sidebar />
+        <>
+          <AnalysisQuestionBar />
           <MainContent />
-        </div>
+          <EditModal />
+        </>
       )}
     </div>
   );

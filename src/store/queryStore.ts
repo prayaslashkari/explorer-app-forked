@@ -23,6 +23,8 @@ interface QueryStore {
   stepProgress: StepProgress[];
   pipelineResult: PipelineResult | null;
   isRunning: boolean;
+  isEditModalOpen: boolean;
+  questionSnapshot: AnalysisQuestion | null;
 
   navigateTo: (view: AppView) => void;
   loadPrebuiltQuery: (id: string, question: AnalysisQuestion) => void;
@@ -33,6 +35,10 @@ interface QueryStore {
   setRelationship: (rel: SpatialRelationship) => void;
   setQuestion: (q: AnalysisQuestion) => void;
   resetQuestion: () => void;
+
+  openEditModal: () => void;
+  closeEditModal: () => void;
+  discardEditModal: () => void;
 
   setIsRunning: (running: boolean) => void;
   addStepProgress: (progress: StepProgress) => void;
@@ -47,6 +53,8 @@ export const useQueryStore = create<QueryStore>((set) => ({
   stepProgress: [],
   pipelineResult: null,
   isRunning: false,
+  isEditModalOpen: false,
+  questionSnapshot: null,
 
   navigateTo: (currentView) => set({ currentView }),
   loadPrebuiltQuery: (id, question) =>
@@ -70,6 +78,21 @@ export const useQueryStore = create<QueryStore>((set) => ({
   setRelationship: (rel) => set((s) => ({ question: { ...s.question, relationship: rel } })),
   setQuestion: (question) => set({ question }),
   resetQuestion: () => set({ question: defaultQuestion() }),
+
+  openEditModal: () =>
+    set((s) => ({
+      isEditModalOpen: true,
+      questionSnapshot: JSON.parse(JSON.stringify(s.question)),
+      stepProgress: [],
+      pipelineResult: null,
+    })),
+  closeEditModal: () => set({ isEditModalOpen: false, questionSnapshot: null }),
+  discardEditModal: () =>
+    set((s) => ({
+      isEditModalOpen: false,
+      question: s.questionSnapshot || s.question,
+      questionSnapshot: null,
+    })),
 
   setIsRunning: (isRunning) => set({ isRunning }),
   addStepProgress: (progress) =>
