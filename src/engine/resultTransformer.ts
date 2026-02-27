@@ -19,16 +19,26 @@ function parseWKTLineString(wkt: string): LatLngExpression[] | null {
   });
 }
 
+function parseRing(ringStr: string): LatLngExpression[] {
+  return ringStr.split(',').map((pair) => {
+    const [lon, lat] = pair.trim().split(/\s+/).map(Number);
+    return [lat, lon] as LatLngExpression;
+  });
+}
+
 function parseWKTPolygon(wkt: string): LatLngExpression[][] | null {
-  const match = wkt.match(/POLYGON\s*\(\((.+)\)\)/i);
+  // Anchor with (?<!MULTI) to avoid matching MULTIPOLYGON
+  const match = wkt.match(/(?<!MULTI)POLYGON\s*\(\s*\((.+)\)\s*\)/i);
   if (!match) return null;
-  const rings = match[1].split('),(').map((ring) =>
-    ring.split(',').map((pair) => {
-      const [lon, lat] = pair.trim().split(/\s+/).map(Number);
-      return [lat, lon] as LatLngExpression;
-    })
+  return match[1].split(/\)\s*,\s*\(/).map(parseRing);
+}
+
+function parseWKTMultiPolygon(wkt: string): LatLngExpression[][][] | null {
+  const match = wkt.match(/MULTIPOLYGON\s*\(\s*\(\s*\((.+)\)\s*\)\s*\)/i);
+  if (!match) return null;
+  return match[1].split(/\)\s*\)\s*,\s*\(\s*\(/).map((polygon) =>
+    polygon.split(/\)\s*,\s*\(/).map(parseRing)
   );
-  return rings;
 }
 
 function nonNull<T>(val: T | null | undefined): val is T {
@@ -77,57 +87,63 @@ export function transformFacilitiesToFeatures(rows: SparqlRow[]): MapFeature[] {
 }
 
 export function transformWaterBodiesToFeatures(rows: SparqlRow[]): MapFeature[] {
-  return rows
-    .filter((r) => r.wbWKT)
-    .map((row): MapFeature | null => {
-      const wkt = row.wbWKT;
-      let geometry: MapFeature['geometry'];
+  const features: MapFeature[] = [];
 
-      const pointCoords = parseWKTPoint(wkt);
-      if (pointCoords) {
-        geometry = { type: 'Point', coordinates: pointCoords };
-      } else {
-        const lineCoords = parseWKTLineString(wkt);
-        if (lineCoords) {
-          geometry = { type: 'LineString', coordinates: lineCoords };
-        } else {
-          const polyCoords = parseWKTPolygon(wkt);
-          if (polyCoords) {
-            geometry = { type: 'Polygon', coordinates: polyCoords };
-          } else {
-            return null;
-          }
-        }
+  for (const row of rows) {
+    if (!row.wbWKT) continue;
+    const wkt = row.wbWKT;
+    const props = { type: 'waterBody', name: row.wbName || 'Unknown Water Body' };
+
+    const pointCoords = parseWKTPoint(wkt);
+    if (pointCoords) {
+      features.push({ id: row.waterBody, geometry: { type: 'Point', coordinates: pointCoords }, properties: props });
+      continue;
+    }
+
+    const lineCoords = parseWKTLineString(wkt);
+    if (lineCoords) {
+      features.push({ id: row.waterBody, geometry: { type: 'LineString', coordinates: lineCoords }, properties: props });
+      continue;
+    }
+
+    const polyCoords = parseWKTPolygon(wkt);
+    if (polyCoords) {
+      features.push({ id: row.waterBody, geometry: { type: 'Polygon', coordinates: polyCoords }, properties: props });
+      continue;
+    }
+
+    const multiCoords = parseWKTMultiPolygon(wkt);
+    if (multiCoords) {
+      for (let i = 0; i < multiCoords.length; i++) {
+        features.push({ id: `${row.waterBody}_${i}`, geometry: { type: 'Polygon', coordinates: multiCoords[i] }, properties: props });
       }
+    }
+  }
 
-      return {
-        id: row.waterBody,
-        geometry,
-        properties: {
-          type: 'waterBody',
-          name: row.wbName || 'Unknown Water Body',
-        },
-      };
-    })
-    .filter(nonNull);
+  return features;
 }
 
 export function transformRegionBoundaries(rows: SparqlRow[]): MapFeature[] {
-  return rows
-    .filter((r) => r.regionWKT)
-    .map((row): MapFeature | null => {
-      const wkt = row.regionWKT;
-      const polyCoords = parseWKTPolygon(wkt);
-      if (!polyCoords) return null;
+  const features: MapFeature[] = [];
 
-      return {
-        id: row.region,
-        geometry: { type: 'Polygon', coordinates: polyCoords },
-        properties: {
-          type: 'regionBoundary',
-          name: row.regionName || '',
-        },
-      };
-    })
-    .filter(nonNull);
+  for (const row of rows) {
+    if (!row.regionWKT) continue;
+    const wkt = row.regionWKT;
+    const props = { type: 'regionBoundary', name: row.regionName || '' };
+
+    const polyCoords = parseWKTPolygon(wkt);
+    if (polyCoords) {
+      features.push({ id: row.region, geometry: { type: 'Polygon', coordinates: polyCoords }, properties: props });
+      continue;
+    }
+
+    const multiCoords = parseWKTMultiPolygon(wkt);
+    if (multiCoords) {
+      for (let i = 0; i < multiCoords.length; i++) {
+        features.push({ id: `${row.region}_${i}`, geometry: { type: 'Polygon', coordinates: multiCoords[i] }, properties: props });
+      }
+    }
+  }
+
+  return features;
 }

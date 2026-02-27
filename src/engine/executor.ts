@@ -62,8 +62,12 @@ export async function executePipeline(
       const results = await executeSparql(step.endpoint, query);
 
       // If this step produces S2 cells, update context
-      if (S2_PRODUCING_STEPS.has(step.type) && results.length > 0 && results[0].s2cell) {
-        context.s2Cells = results.map((r) => shortenS2URI(r.s2cell));
+      if (S2_PRODUCING_STEPS.has(step.type)) {
+        if (results.length > 0 && results[0].s2cell) {
+          context.s2Cells = results.map((r) => shortenS2URI(r.s2cell));
+        } else {
+          context.s2Cells = [];
+        }
 
         // Save anchor S2 cells after the initial steps (before spatial expansion/tracing)
         if (step.type === 'GET_S2_FOR_ANCHOR' || step.type === 'FILTER_S2_TO_REGION') {

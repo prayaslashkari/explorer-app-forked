@@ -6,6 +6,7 @@ export function buildDiscoverCountiesQuery(stateCode: string): string {
     SELECT DISTINCT ?county ?countyName WHERE {
       ?county kwg-ont:administrativePartOf kwgr:administrativeRegion.USA.${stateCode} ;
               rdfs:label ?countyName .
+      FILTER(STRSTARTS(STR(?county), STR(kwgr:)))
     } ORDER BY ?countyName
   `;
 }

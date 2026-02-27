@@ -1,15 +1,20 @@
 import { PREFIXES } from '../../constants/prefixes';
 import type { SampleFilters } from '../../types/query';
 
+function wrapUri(uri: string): string {
+  if (uri.startsWith('http://') || uri.startsWith('https://')) return `<${uri}>`;
+  return uri;
+}
+
 function buildSampleFilterClauses(filters?: SampleFilters): string {
   if (!filters) return '';
   let clauses = '';
 
   if (filters.substances?.length) {
-    clauses += `VALUES ?substance { ${filters.substances.join(' ')} }\n      `;
+    clauses += `VALUES ?substance { ${filters.substances.map(wrapUri).join(' ')} }\n      `;
   }
   if (filters.materialTypes?.length) {
-    clauses += `VALUES ?matType { ${filters.materialTypes.join(' ')} }\n      `;
+    clauses += `VALUES ?matType { ${filters.materialTypes.map(wrapUri).join(' ')} }\n      `;
   }
   if (filters.minConcentration != null) {
     clauses += `FILTER (?result_value > ${filters.minConcentration})\n      `;
