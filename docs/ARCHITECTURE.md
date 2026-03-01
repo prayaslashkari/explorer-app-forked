@@ -134,9 +134,12 @@ sawgraph-query-editor/
 │       ├── prefixes.ts      # SPARQL namespace prefixes
 │       └── regions.ts       # US states with data
 │
-├── FINDINGS.md              # Bugs, data model notes
-├── DISCOVERY.md             # Predicate inventories
-└── ARCHITECTURE.md          # This file
+└── docs/
+    ├── ARCHITECTURE.md      # This file
+    ├── DISCOVERY.md         # Predicate inventories + debugging findings
+    ├── CONVENTIONS.md       # Coding standards and patterns
+    ├── changelog/           # Weekly changelog files (YYYY-Www.md)
+    └── plans/               # Planning workflow (drafts → active → done)
 ```
 
 **Key directories:**
@@ -674,10 +677,10 @@ SELECT ?entity ?wkt ?name WHERE {
 
 ## Debugging Tips
 
-### 1. Check FINDINGS.md and DISCOVERY.md
+### 1. Check docs/DISCOVERY.md
 
-- `FINDINGS.md` — Known bugs, data coverage gaps
-- `DISCOVERY.md` — Predicate inventories (what predicates exist on each entity type)
+- Predicate inventories (what predicates exist on each entity type)
+- Known bugs, data coverage gaps, debugging findings (merged from FINDINGS.md)
 
 ### 2. Inspect Pipeline Steps
 

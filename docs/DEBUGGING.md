@@ -1,4 +1,4 @@
-# SAWGraph Query Editor — Debugging Findings
+# SAWGraph — Debugging Findings
 
 Documented discoveries from investigating pipeline behavior and KWG data.
 
@@ -151,3 +151,44 @@ Small states like Alabama (39 S2 cells) weren't in the arbitrary 5000 cells retu
 - `planner.ts`: Changed all three waterBodies cases from `endpoint: 'spatialkg'` → `endpoint: 'hydrologykg'`
 
 **Reference:** Python notebook `UC1_CQ2_WaterBodies_Near_Facilities(2026_02_12_Update).ipynb` has the correct queries.
+
+---
+
+## 8. Pipeline Restructure — Double Expansion, Wrong Anchors, Wrong Endpoint (FIXED)
+
+Three interconnected bugs caused incorrect map results for spatial relationship queries.
+
+### Bug 8a: Double S2 Expansion for "near" (FIXED)
+`FILTER_S2_TO_REGION` (which uses `sfTouches | owl:sameAs`) followed by `EXPAND_S2_NEAR` (same) created 2 hops of expansion (~2-4km) instead of the notebook's 1 hop (~1-2km). After adding `regionCode` to Step 1's SPARQL, the region filter step became redundant — but its expansion side-effect remained.
+
+**Fix:** Removed `filterS2ToRegionStep` from all three relationship pipelines. Step 1 now handles region filtering directly in SPARQL. A single `expandNearStep()` provides the correct 1-hop expansion. For downstream/upstream, `expandNearStep` replaces `filterS2ToRegionStep` (the expansion is still needed to capture nearby flow paths; only the redundant region filter was removed).
+
+### Bug 8b: Anchor Details Showed ALL Anchor Entities (FIXED)
+`GET_ANCHOR_DETAILS` used `anchorS2Cells` (all anchor S2 cells from Step 1), so the map showed every Alabama facility (42) even though only 1 sample was found. Most facilities had no sample near them.
+
+**Fix:** Added new pipeline step `FILTER_ANCHOR_TO_NEARBY_TARGETS` between `FIND_TARGET_ENTITIES` and `GET_ANCHOR_DETAILS` (for "near" only):
+1. Target entity queries now also `SELECT ?s2cell`
+2. Executor extracts target S2 cells into `context.targetS2Cells` after `FIND_TARGET_ENTITIES`
+3. New step queries spatialkg: find anchor S2 cells that touch any target S2 cell
+4. Updates `context.anchorS2Cells` to only the relevant anchors
+5. If `FIND_TARGET_ENTITIES` returns 0 results, pipeline returns `'empty'` immediately
+
+For downstream/upstream, reverse directional trace is expensive — all anchors still shown (future enhancement).
+
+### Bug 8c: Wrong Endpoint for Facility Queries (FIXED)
+`FIND_TARGET_ENTITIES` and `GET_ANCHOR_DETAILS` for facilities used `fiokg`, but `kwg-ont:sfContains` (linking S2 cells to facilities) requires the federated graph. `fiokg` alone returned 14/42 Alabama facilities.
+
+**Fix:** Changed both steps to `endpoint: 'federation'`.
+
+**Files Modified:** `planner.ts`, `executor.ts`, `templates/spatial.ts`, `templates/samples.ts`, `templates/facilities.ts`, `templates/waterBodies.ts`
+
+---
+
+## 2026-02-28 — HierarchicalSelect not showing pre-selected industry codes
+
+**Component**: `HierarchicalSelect/useNaicsTree.ts` — `collapseSelections` function
+**Symptom**: Opening the edit modal for a prebuilt query with `industryCodes: ['3253']` showed "Any industry..." placeholder instead of a chip for 3253.
+**Root cause**: `collapseSelections` assumed incoming codes were always fully expanded (parent + all descendants). When only the parent code `"3253"` was present without its child codes (`325311`, etc.), the function detected a "partial selection", recursed into children, found none selected, and returned an empty `userSelections` set.
+**Fix**: Simplified the logic — when a node's code is in `allCodes`, always add it to `userSelections` regardless of whether all descendants are also selected.
+**Files touched**: `src/components/QueryEditor/HierarchicalSelect/useNaicsTree.ts`
+**Prevention**: When writing selection collapse/expand logic, handle the case where stored data may not match the fully expanded representation.

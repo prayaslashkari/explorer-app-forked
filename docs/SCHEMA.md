@@ -1,4 +1,4 @@
-# SAWGraph — Schema Discovery
+# SAWGraph — Schema & Data Model
 
 Predicate inventories discovered via exploratory SPARQL queries against the KWG endpoints.
 
@@ -429,7 +429,7 @@ Water bodies are linked to counties (`AdministrativeRegion_2` in hydrologykg = c
 - Note: `coso:Sample` class does not exist; actual class is `coso:MaterialSample`
 
 ### Water Bodies (`waterBodies.ts`) — FIXED
-- Was using wrong type, predicate, endpoint, and label (see FINDINGS.md #6)
+- Was using wrong type, predicate, endpoint, and label (see DEBUGGING.md #7)
 - Now uses: `hyf:HY_WaterBody`, `spatial:connectedTo`, `hydrologykg`, `schema:name`
 
 ### Hydrology (`hydrology.ts`) — CORRECT
@@ -438,3 +438,5 @@ Water bodies are linked to counties (`AdministrativeRegion_2` in hydrologykg = c
 - S2 linkage: `spatial:connectedTo` — confirmed
 - No `upstreamFlowPathTC` predicate exists; upstream tracing uses `downstreamFlowPathTC` in reverse (correct)
 - Note: `hyfo:FlowPath` does not exist; `hyfo:` namespace has zero predicates in hydrologykg (only used for class types like `hyfo:WaterFeatureRepresentation`)
+
+---
