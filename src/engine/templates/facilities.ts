@@ -40,7 +40,7 @@ export function buildFacilityDetailsQuery(
 
   return `
     ${PREFIXES}
-    SELECT DISTINCT ?facility ?facWKT ?facilityName ?industryCode ?industryName WHERE {
+    SELECT DISTINCT ?facility ?facWKT ?facilityName ?industryCode ?industryName ?s2cell WHERE {
       ${s2ValuesClause}
       ?facility fio:ofIndustry ?industryGroup ;
                 fio:ofIndustry ?industryCode ;

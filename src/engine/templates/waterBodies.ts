@@ -36,7 +36,7 @@ export function buildWaterBodyRetrievalQuery(
 
   return `
     ${PREFIXES}
-    SELECT DISTINCT ?waterBody ?wbWKT ?wbName WHERE {
+    SELECT DISTINCT ?waterBody ?wbWKT ?wbName ?s2cell WHERE {
       VALUES ?s2cell { ${s2ValuesString} }
       ?s2cell spatial:connectedTo ?waterBody .
       ?waterBody rdf:type hyf:HY_WaterBody ;

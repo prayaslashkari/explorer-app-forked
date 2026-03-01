@@ -69,7 +69,7 @@ export function buildSampleRetrievalQuery(
       (MAX(?result_value) as ?max)
       (GROUP_CONCAT(DISTINCT ?substance; separator="; ") as ?substances)
       (GROUP_CONCAT(DISTINCT ?matTypeLabel; separator="; ") as ?materials)
-      ?sp ?spWKT
+      ?sp ?spWKT ?s2cell
     WHERE {
       ?sp rdf:type coso:SamplePoint ;
           spatial:connectedTo ?s2cell ;
@@ -88,6 +88,6 @@ export function buildSampleRetrievalQuery(
       ?unit qudt:symbol ?unit_sym .
       ${filterClauses}
       BIND((CONCAT(str(?result_value), " ", ?unit_sym)) as ?subVal)
-    } GROUP BY ?sp ?spWKT
+    } GROUP BY ?sp ?spWKT ?s2cell
   `;
 }

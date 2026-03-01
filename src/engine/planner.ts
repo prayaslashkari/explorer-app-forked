@@ -5,7 +5,7 @@ import { s2CellsToValuesString } from '../utils/s2cells';
 import { buildFacilityS2Query, buildFacilityDetailsQuery } from './templates/facilities';
 import { buildSampleS2Query, buildSampleRetrievalQuery } from './templates/samples';
 import { buildWaterBodyS2Query, buildWaterBodyRetrievalQuery } from './templates/waterBodies';
-import { buildRegionFilterQuery, buildStrictRegionFilterQuery, buildNearExpansionQuery, buildRegionBoundaryQuery } from './templates/spatial';
+import { buildStrictRegionFilterQuery, buildNearExpansionQuery, buildAnchorFilterByTargetProximity, buildRegionBoundaryQuery } from './templates/spatial';
 import { buildDownstreamTraceQuery, buildUpstreamTraceQuery } from './templates/hydrology';
 
 export type PipelineStepType =
@@ -16,6 +16,7 @@ export type PipelineStepType =
   | 'TRACE_UPSTREAM'
   | 'FILTER_S2_POST_SPATIAL'
   | 'FIND_TARGET_ENTITIES'
+  | 'FILTER_ANCHOR_TO_NEARBY_TARGETS'
   | 'GET_ANCHOR_DETAILS'
   | 'GET_REGION_BOUNDARIES';
 
@@ -30,6 +31,7 @@ export interface PipelineContext {
   question: AnalysisQuestion;
   s2Cells: string[];
   anchorS2Cells: string[];
+  targetS2Cells: string[];
   results: Record<string, SparqlRow[]>;
 }
 
@@ -59,17 +61,6 @@ function getS2Step(block: EntityBlock, regionCode?: string): PipelineStep {
   }
 }
 
-function filterS2ToRegionStep(regionCode: string): PipelineStep {
-  return {
-    type: 'FILTER_S2_TO_REGION',
-    endpoint: 'spatialkg',
-    description: `Filtering to region ${regionCode}`,
-    buildQuery: (ctx) => {
-      const vals = s2CellsToValuesString(ctx.s2Cells);
-      return buildRegionFilterQuery(vals, regionCode);
-    },
-  };
-}
 
 function strictRegionFilterStep(regionCode: string): PipelineStep {
   return {
@@ -91,6 +82,19 @@ function expandNearStep(): PipelineStep {
     buildQuery: (ctx) => {
       const vals = s2CellsToValuesString(ctx.s2Cells);
       return buildNearExpansionQuery(vals);
+    },
+  };
+}
+
+function filterAnchorToNearbyTargetsStep(): PipelineStep {
+  return {
+    type: 'FILTER_ANCHOR_TO_NEARBY_TARGETS',
+    endpoint: 'spatialkg',
+    description: 'Filtering anchors to only those near found targets',
+    buildQuery: (ctx) => {
+      const anchorVals = s2CellsToValuesString(ctx.anchorS2Cells);
+      const targetVals = s2CellsToValuesString(ctx.targetS2Cells);
+      return buildAnchorFilterByTargetProximity(anchorVals, targetVals);
     },
   };
 }
@@ -134,7 +138,7 @@ function findEntitiesStep(block: EntityBlock): PipelineStep {
     case 'facilities':
       return {
         type: 'FIND_TARGET_ENTITIES',
-        endpoint: 'fiokg',
+        endpoint: 'federation',
         description: 'Finding facilities in target area',
         buildQuery: (ctx) => buildFacilityDetailsQuery(block.facilityFilters, ctx.s2Cells),
       };
@@ -156,7 +160,7 @@ function getDetailsStep(block: EntityBlock): PipelineStep {
     case 'facilities':
       return {
         type: 'GET_ANCHOR_DETAILS',
-        endpoint: 'fiokg',
+        endpoint: 'federation',
         description: 'Getting facility details for map',
         buildQuery: (ctx) => buildFacilityDetailsQuery(block.facilityFilters, ctx.anchorS2Cells),
       };
@@ -195,20 +199,19 @@ export function planPipeline(question: AnalysisQuestion): PipelineStep[] {
   const steps: PipelineStep[] = [];
 
   if (relationship.type === 'near') {
-    // Start from Block C (the anchor entity), find Block A nearby
+    // Start from Block C (the anchor entity), find Block A nearby.
+    // Step 1 filters to region directly in SPARQL, so no separate region filter
+    // step is needed — that would cause a double expansion (wrong search radius).
     const regionCodeC = getRegionCode(blockC);
     const regionCodeA = getRegionCode(blockA);
     const preExpandRegion = regionCodeC || regionCodeA;
 
-    // Pass region code to S2 query so it can filter directly in SPARQL
-    steps.push(getS2Step(blockC, preExpandRegion));
+    steps.push(getS2Step(blockC, preExpandRegion));  // anchorS2Cells saved here
 
-    // Still add explicit region filter for endpoints that don't support it natively
-    if (preExpandRegion) steps.push(filterS2ToRegionStep(preExpandRegion));
-
+    // Single expansion hop (~1-2km), matching the notebook approach
     steps.push(expandNearStep());
 
-    // Also filter AFTER expanding to the target region
+    // Clip to Block A's region after expansion to avoid cross-border targets
     if (regionCodeA) {
       steps.push({
         ...strictRegionFilterStep(regionCodeA),
@@ -216,23 +219,29 @@ export function planPipeline(question: AnalysisQuestion): PipelineStep[] {
       });
     }
 
-    steps.push(findEntitiesStep(blockA));
+    steps.push(findEntitiesStep(blockA));  // targetS2Cells extracted here by executor
+
+    // Reverse-lookup: only show anchor entities that are near the found targets
+    steps.push(filterAnchorToNearbyTargetsStep());  // updates anchorS2Cells
+
     steps.push(getDetailsStep(blockC));
   } else if (relationship.type === 'downstream') {
-    // Start from Block C (facilities), trace downstream, find Block A
+    // Start from Block C (anchor), trace downstream, find Block A (targets).
+    // Expand 1 hop before tracing to capture flow paths near the anchor cells.
+    // Step 1 already filters to region, so we use expandNearStep (not filterS2ToRegionStep)
+    // to avoid a redundant region filter.
     const regionCodeC = getRegionCode(blockC);
     const regionCodeA = getRegionCode(blockA);
     const preTraceRegion = regionCodeC || regionCodeA;
 
-    // Pass region code to S2 query so it can filter directly in SPARQL
-    steps.push(getS2Step(blockC, preTraceRegion));
+    steps.push(getS2Step(blockC, preTraceRegion));  // anchorS2Cells saved here
 
-    // Still add explicit region filter for endpoints that don't support it natively
-    if (preTraceRegion) steps.push(filterS2ToRegionStep(preTraceRegion));
+    // Expand to capture flow paths in adjacent cells before tracing downstream
+    steps.push(expandNearStep());
 
     steps.push(traceDownstreamStep());
 
-    // Also filter AFTER tracing to the target region (strict, no expansion)
+    // Strict region filter on Block A's region after tracing (no expansion)
     if (regionCodeA) {
       steps.push(strictRegionFilterStep(regionCodeA));
     }
@@ -240,14 +249,14 @@ export function planPipeline(question: AnalysisQuestion): PipelineStep[] {
     steps.push(findEntitiesStep(blockA));
     steps.push(getDetailsStep(blockC));
   } else if (relationship.type === 'upstream') {
-    // Start from Block A (samples), trace upstream, find Block C
+    // Start from Block A (anchor), trace upstream, find Block C (targets).
+    // Expand 1 hop before tracing to capture flow paths near the anchor cells.
     const regionCodeA = getRegionCode(blockA);
 
-    // Pass region code to S2 query so it can filter directly in SPARQL
-    steps.push(getS2Step(blockA, regionCodeA));
+    steps.push(getS2Step(blockA, regionCodeA));  // anchorS2Cells saved here
 
-    // Still add explicit region filter for endpoints that don't support it natively
-    if (regionCodeA) steps.push(filterS2ToRegionStep(regionCodeA));
+    // Expand to capture flow paths in adjacent cells before tracing upstream
+    steps.push(expandNearStep());
 
     steps.push(traceUpstreamStep());
 

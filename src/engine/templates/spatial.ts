@@ -38,6 +38,23 @@ export function buildNearExpansionQuery(s2ValuesString: string): string {
   `;
 }
 
+// Finds anchor S2 cells that touch any of the target S2 cells.
+// Used after FIND_TARGET_ENTITIES to filter GET_ANCHOR_DETAILS to only
+// anchors that are genuinely near the found targets (not all anchors).
+export function buildAnchorFilterByTargetProximity(
+  anchorS2ValuesString: string,
+  targetS2ValuesString: string
+): string {
+  return `
+    ${PREFIXES}
+    SELECT DISTINCT ?anchor WHERE {
+      VALUES ?anchor { ${anchorS2ValuesString} }
+      VALUES ?target { ${targetS2ValuesString} }
+      ?anchor kwg-ont:sfTouches | owl:sameAs ?target .
+    }
+  `;
+}
+
 export function buildRegionBoundaryQuery(regionCode: string): string {
   return `
     ${PREFIXES}
