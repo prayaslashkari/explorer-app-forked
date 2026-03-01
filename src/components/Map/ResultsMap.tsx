@@ -4,6 +4,7 @@ import { SampleLayer } from './SampleLayer';
 import { FacilityLayer } from './FacilityLayer';
 import { WaterBodyLayer } from './WaterBodyLayer';
 import { RegionBoundaryLayer } from './RegionBoundaryLayer';
+import { MapCenterController } from './MapCenterController';
 import 'leaflet/dist/leaflet.css';
 
 interface ResultsMapProps {
@@ -26,6 +27,9 @@ export function ResultsMap({ layers }: ResultsMapProps) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+
+      {/* Auto-center controller - renders nothing, just manages map view */}
+      <MapCenterController layers={layers} />
 
       {hasData && (
         <LayersControl position="topright">
