@@ -12,8 +12,8 @@ export function PipelineTimeline({ steps, isRunning }: PipelineTimelineProps) {
     <div className="pipeline-timeline">
       <h3>Pipeline Progress</h3>
       <div className="timeline-steps">
-        {steps.map((step, i) => {
-          const isLast = i === steps.length - 1;
+        {steps.filter(Boolean).map((step, i, arr) => {
+          const isLast = i === arr.length - 1;
           return (
             <div key={i} className={`timeline-step timeline-step--${step.status}`}>
               <div className="timeline-indicator">

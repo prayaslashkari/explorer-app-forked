@@ -25,10 +25,12 @@ interface QueryStore {
   isRunning: boolean;
   isEditModalOpen: boolean;
   questionSnapshot: AnalysisQuestion | null;
+  pendingAutoRun: boolean;
 
   navigateTo: (view: AppView) => void;
   loadPrebuiltQuery: (id: string, question: AnalysisQuestion) => void;
   goToDashboard: () => void;
+  clearPendingAutoRun: () => void;
 
   setBlockA: (block: EntityBlock) => void;
   setBlockC: (block: EntityBlock) => void;
@@ -55,6 +57,7 @@ export const useQueryStore = create<QueryStore>((set) => ({
   isRunning: false,
   isEditModalOpen: false,
   questionSnapshot: null,
+  pendingAutoRun: false,
 
   navigateTo: (currentView) => set({ currentView }),
   loadPrebuiltQuery: (id, question) =>
@@ -64,7 +67,9 @@ export const useQueryStore = create<QueryStore>((set) => ({
       currentView: 'editor',
       stepProgress: [],
       pipelineResult: null,
+      pendingAutoRun: true,
     }),
+  clearPendingAutoRun: () => set({ pendingAutoRun: false }),
   goToDashboard: () =>
     set({
       currentView: 'dashboard',
@@ -84,7 +89,6 @@ export const useQueryStore = create<QueryStore>((set) => ({
       isEditModalOpen: true,
       questionSnapshot: JSON.parse(JSON.stringify(s.question)),
       stepProgress: [],
-      pipelineResult: null,
     })),
   closeEditModal: () => set({ isEditModalOpen: false, questionSnapshot: null }),
   discardEditModal: () =>

@@ -67,23 +67,25 @@ export function transformSamplesToFeatures(rows: SparqlRow[]): MapFeature[] {
 }
 
 export function transformFacilitiesToFeatures(rows: SparqlRow[]): MapFeature[] {
-  return rows
-    .filter((r) => r.facWKT)
-    .map((row): MapFeature | null => {
-      const coords = parseWKTPoint(row.facWKT);
-      if (!coords) return null;
-      return {
-        id: row.facility,
-        geometry: { type: 'Point', coordinates: coords },
-        properties: {
-          type: 'facility',
-          name: row.facilityName || '',
-          industryCode: row.industryCode || '',
-          industryName: row.industryName || '',
-        },
-      };
-    })
-    .filter(nonNull);
+  // Deduplicate by facility URI — same facility may appear with multiple industry codes
+  const seen = new Map<string, MapFeature>();
+  for (const row of rows) {
+    if (!row.facWKT) continue;
+    if (seen.has(row.facility)) continue;
+    const coords = parseWKTPoint(row.facWKT);
+    if (!coords) continue;
+    seen.set(row.facility, {
+      id: row.facility,
+      geometry: { type: 'Point', coordinates: coords },
+      properties: {
+        type: 'facility',
+        name: row.facilityName || '',
+        industryCode: row.industryCode || '',
+        industryName: row.industryName || '',
+      },
+    });
+  }
+  return Array.from(seen.values());
 }
 
 export function transformWaterBodiesToFeatures(rows: SparqlRow[]): MapFeature[] {

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useQueryStore } from '../../store/queryStore';
 import { useQueryPipeline } from '../../hooks/useQueryPipeline';
 import { QueryEditorContent } from './QueryEditorContent';
@@ -11,23 +11,25 @@ export function EditModal() {
   const discardEditModal = useQueryStore((s) => s.discardEditModal);
   const stepProgress = useQueryStore((s) => s.stepProgress);
   const pipelineResult = useQueryStore((s) => s.pipelineResult);
+  const question = useQueryStore((s) => s.question);
+  const questionSnapshot = useQueryStore((s) => s.questionSnapshot);
   const { runPipeline, isRunning } = useQueryPipeline();
+
+  const hasChanges = useMemo(() => {
+    if (!questionSnapshot) return false;
+    return JSON.stringify(question) !== JSON.stringify(questionSnapshot);
+  }, [question, questionSnapshot]);
 
   const handleDiscard = useCallback(() => {
     if (!isRunning) discardEditModal();
   }, [isRunning, discardEditModal]);
 
   const handleApply = useCallback(async () => {
-    await runPipeline();
-  }, [runPipeline]);
-
-  // Auto-close on successful pipeline completion
-  useEffect(() => {
-    if (pipelineResult?.status === 'success' && !isRunning && isOpen) {
-      const timer = setTimeout(() => closeEditModal(), 800);
-      return () => clearTimeout(timer);
+    const result = await runPipeline();
+    if (result.status === 'success') {
+      setTimeout(() => closeEditModal(), 800);
     }
-  }, [pipelineResult, isRunning, isOpen, closeEditModal]);
+  }, [runPipeline, closeEditModal]);
 
   // Escape key to discard
   useEffect(() => {
@@ -70,7 +72,7 @@ export function EditModal() {
           <button className="btn-secondary" onClick={handleDiscard} disabled={isRunning}>
             Discard Changes
           </button>
-          <button className="btn-primary" onClick={handleApply} disabled={isRunning}>
+          <button className="btn-primary" onClick={handleApply} disabled={isRunning || !hasChanges}>
             {isRunning ? 'Running...' : 'Apply'}
           </button>
         </div>
