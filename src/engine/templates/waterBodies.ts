@@ -5,6 +5,7 @@ export function buildWaterBodyS2Query(filters?: WaterBodyFilters, regionCode?: s
   let filterClauses = '';
   if (filters?.ftypes?.length) {
     const ftypeValues = filters.ftypes.map(f => `"${f}"`).join(' ');
+    filterClauses += `?waterBody nhdplusv2:hasFTYPE ?ftype .\n      `;
     filterClauses += `VALUES ?ftype { ${ftypeValues} }\n      `;
   }
 
@@ -31,6 +32,7 @@ export function buildWaterBodyRetrievalQuery(
   let filterClauses = '';
   if (filters?.ftypes?.length) {
     const ftypeValues = filters.ftypes.map(f => `"${f}"`).join(' ');
+    filterClauses += `?waterBody nhdplusv2:hasFTYPE ?ftype .\n      `;
     filterClauses += `VALUES ?ftype { ${ftypeValues} }\n      `;
   }
 
