@@ -24,10 +24,17 @@ export const LAYER_REGISTRY: LayerConfig[] = [
   },
   {
     key: 'waterBodies',
-    label: 'Water Bodies',
+    label: 'Surface Water Bodies',
     defaultVisible: true,
     legendSvg:
       '<svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 15,14 1,14" fill="#3498db" stroke="#2980b9" stroke-width="1.5"/></svg>',
+  },
+  {
+    key: 'wells',
+    label: 'Subsurface Water Bodies',
+    defaultVisible: true,
+    legendSvg:
+      '<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="#A0522D" stroke="#8B4513" stroke-width="1.5"/></svg>',
   },
   {
     key: 'regionBoundaries',

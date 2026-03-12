@@ -42,7 +42,9 @@ function describeEntity(block: EntityBlock): string {
       return 'facilities';
     }
     case 'waterBodies':
-      return 'water bodies';
+      return 'surface water bodies';
+    case 'wells':
+      return 'wells';
   }
 }
 

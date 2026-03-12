@@ -5,6 +5,7 @@ import type { MapFeature } from '../../types/map';
 import { SampleLayer } from './SampleLayer';
 import { FacilityLayer } from './FacilityLayer';
 import { WaterBodyLayer } from './WaterBodyLayer';
+import { WellLayer } from './WellLayer';
 import { RegionBoundaryLayer } from './RegionBoundaryLayer';
 import { MapCenterController } from './MapCenterController';
 import { LayerPanel } from './LayerPanel';
@@ -19,6 +20,7 @@ const LAYER_COMPONENTS: Record<string, ComponentType<{ features: MapFeature[] }>
   samples: SampleLayer,
   facilities: FacilityLayer,
   waterBodies: WaterBodyLayer,
+  wells: WellLayer,
   regionBoundaries: RegionBoundaryLayer,
 };
 
@@ -28,7 +30,8 @@ export function ResultsMap({ layers }: ResultsMapProps) {
   const hasData =
     layers.samples.length > 0 ||
     layers.facilities.length > 0 ||
-    layers.waterBodies.length > 0;
+    layers.waterBodies.length > 0 ||
+    layers.wells.length > 0;
 
   const handleToggle = (key: string) => {
     setVisibility((prev) => ({ ...prev, [key]: !prev[key] }));

@@ -32,7 +32,15 @@ export function MapPopupContent({ feature }: MapPopupProps) {
   if (props.type === 'waterBody') {
     return (
       <div className="map-popup">
-        <strong>{props.name || 'Water Body'}</strong>
+        <strong>{props.name || 'Surface Water Body'}</strong>
+      </div>
+    );
+  }
+
+  if (props.type === 'well') {
+    return (
+      <div className="map-popup">
+        <strong>{props.name || 'Well'}</strong>
       </div>
     );
   }

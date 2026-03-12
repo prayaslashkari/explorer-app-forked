@@ -24,6 +24,13 @@ function calculateBounds(layers: MapLayerData): L.LatLngBounds | null {
     }
   }
 
+  // Wells (Point)
+  for (const feature of layers.wells) {
+    if (feature.geometry.type === 'Point') {
+      allCoordinates.push(feature.geometry.coordinates as [number, number]);
+    }
+  }
+
   // Water Bodies (Point | LineString | Polygon)
   for (const feature of layers.waterBodies) {
     if (feature.geometry.type === 'Point') {
