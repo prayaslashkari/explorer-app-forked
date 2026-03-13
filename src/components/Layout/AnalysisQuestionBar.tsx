@@ -1,5 +1,6 @@
 import { useQueryStore } from '../../store/queryStore';
 import { generateQuestion } from '../../utils/questionGenerator';
+import { ExportDropdown } from './ExportDropdown';
 
 export function AnalysisQuestionBar() {
   const question = useQueryStore((s) => s.question);
@@ -22,9 +23,7 @@ export function AnalysisQuestionBar() {
         <button className="btn-secondary" disabled>
           Save
         </button>
-        <button className="btn-secondary" disabled>
-          Export
-        </button>
+        <ExportDropdown />
         <button className="btn-secondary" disabled>
           Publish
         </button>
