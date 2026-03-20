@@ -1015,8 +1015,7 @@
 }
 
 .btn-icon {
-  font-size: 0.7rem;
-  letter-spacing: -0.15em;
+  flex-shrink: 0;
 }
 
 /* Query Cards */

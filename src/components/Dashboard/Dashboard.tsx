@@ -32,7 +32,12 @@ export function Dashboard() {
               className='btn-view-more'
               onClick={() => navigate('/q/new')}
             >
-              <span className='btn-icon'>&#x2b1c;&#x2b1c;</span>
+              <svg className='btn-icon' viewBox='0 0 18 18' fill='currentColor' width='18' height='18' aria-hidden='true'>
+                <rect x='1' y='1' width='7' height='7' rx='1.5' />
+                <rect x='10' y='1' width='7' height='7' rx='1.5' />
+                <rect x='1' y='10' width='7' height='7' rx='1.5' />
+                <rect x='10' y='10' width='7' height='7' rx='1.5' />
+              </svg>
               View more Available Analysis Questions
             </button>
           </div>
