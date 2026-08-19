@@ -8,6 +8,7 @@ import { WaterBodyLayer } from './WaterBodyLayer';
 import { WellLayer } from './WellLayer';
 import { StreamLayer } from './StreamLayer';
 import { RegionBoundaryLayer } from './RegionBoundaryLayer';
+import { AquiferBoundaryLayer } from './AquiferBoundaryLayer';
 import { MapCenterController } from './MapCenterController';
 import { LayerPanel } from './LayerPanel';
 import { BasemapSelector } from './BasemapSelector';
@@ -76,8 +77,12 @@ export function ResultsMap({ layers }: ResultsMapProps) {
 
       <MapCenterController layers={layers} />
 
+      <Pane name="aquiferPane" style={{ zIndex: 340 }}>
+        <AquiferBoundaryLayer visible={!!visibility.aquiferBoundaries} />
+      </Pane>
+
       {LAYER_REGISTRY.map(({ key }) => {
-        const features = layers[key as keyof MapLayerData];
+        const features = layers[key as keyof MapLayerData] || [];
         const Component = LAYER_COMPONENTS[key];
         if (!visibility[key] || !features.length || !Component) return null;
         const pane = LAYER_PANE_CONFIG[key];
@@ -96,7 +101,8 @@ export function ResultsMap({ layers }: ResultsMapProps) {
         <RegionBoundaryLayer features={layers.regionBoundaries} />
       )}
 
-      {hasData && (
+      {/* Panel shows when there's query data OR a static overlay (aquifers) to toggle */}
+      {(hasData || LAYER_REGISTRY.some((e) => e.static)) && (
         <LayerPanel
           visibility={visibility}
           onToggle={handleToggle}
