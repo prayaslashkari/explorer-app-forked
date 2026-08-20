@@ -2,13 +2,13 @@ import { PREFIXES } from '../../constants/prefixes';
 import type {
   EntityBlock,
   FacilityFilters,
-  WellFilters,
   AquiferFilters,
   SpatialRelationship,
 } from '../../types/query';
 import { wrapUri, buildSampleFilterClauses } from './samples';
 import { buildIndustryValues } from './facilities';
 import { AQUIFER_TYPE_VALUES } from './aquifers';
+import { buildWellCategoryFilter } from './wells';
 
 // Returns the entity IRI variable for the block, suffixed to disambiguate
 // anchor vs target sides in a fused query.
@@ -25,22 +25,6 @@ export function entityIriVar(block: EntityBlock, suffix: string): string {
     case 'aquifers':
       return `?aquifer${suffix}`;
   }
-}
-
-function buildWellTypeFilterSuffixed(filters: WellFilters | undefined, suffix: string): string {
-  const wellVar = `?well${suffix}`;
-  const types = filters?.wellTypes;
-  if (!types?.length) {
-    return `{ ${wellVar} rdf:type il_isgs:ISGS-Well } UNION { ${wellVar} rdf:type me_mgs:MGS-Well }`;
-  }
-  const clauses: string[] = [];
-  for (const t of types) {
-    if (t === 'ISGS-Well') clauses.push(`{ ${wellVar} rdf:type il_isgs:ISGS-Well }`);
-    else if (t === 'MGS-Well') clauses.push(`{ ${wellVar} rdf:type me_mgs:MGS-Well }`);
-  }
-  return clauses.length
-    ? clauses.join(' UNION ')
-    : `{ ${wellVar} rdf:type il_isgs:ISGS-Well } UNION { ${wellVar} rdf:type me_mgs:MGS-Well }`;
 }
 
 function buildAquiferTypeFilterSuffixed(filters: AquiferFilters | undefined, suffix: string): string {
@@ -97,7 +81,7 @@ export function bindEntityInCell(block: EntityBlock, s2Var: string, suffix: stri
       ${filterClauses}`;
     }
     case 'wells': {
-      const typeFilter = buildWellTypeFilterSuffixed(block.wellFilters, suffix);
+      const typeFilter = buildWellCategoryFilter(block.wellFilters?.wellCategories, `?well${suffix}`);
       return `${s2Var} spatial:connectedTo ?well${suffix} .
       ${typeFilter}`;
     }

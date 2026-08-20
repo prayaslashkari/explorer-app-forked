@@ -6,6 +6,7 @@ import type {
 } from '../../types/query';
 import { wrapUri } from './samples';
 import { buildIndustryValues } from './facilities';
+import { buildWellCategoryFilter } from './wells';
 
 export {
   buildSampleRetrievalByIriQuery as buildSamplesByIri,
@@ -66,20 +67,7 @@ export function buildWaterBodiesByIri(
 }
 
 export function buildWellsByIri(wellIris: string[], filters?: WellFilters): string {
-  const wellTypes = filters?.wellTypes;
-  let typeFilter: string;
-  if (!wellTypes?.length) {
-    typeFilter = `{ ?well rdf:type il_isgs:ISGS-Well } UNION { ?well rdf:type me_mgs:MGS-Well }`;
-  } else {
-    const clauses: string[] = [];
-    for (const t of wellTypes) {
-      if (t === 'ISGS-Well') clauses.push('{ ?well rdf:type il_isgs:ISGS-Well }');
-      else if (t === 'MGS-Well') clauses.push('{ ?well rdf:type me_mgs:MGS-Well }');
-    }
-    typeFilter = clauses.length
-      ? clauses.join(' UNION ')
-      : `{ ?well rdf:type il_isgs:ISGS-Well } UNION { ?well rdf:type me_mgs:MGS-Well }`;
-  }
+  const typeFilter = buildWellCategoryFilter(filters?.wellCategories, '?well');
   const vals = wellIris.map(wrapUri).join(' ');
 
   return `
