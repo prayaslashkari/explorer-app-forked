@@ -283,6 +283,54 @@ export function buildFusedSampleAggregateQuery(opts: FusedSampleSideOpts): strin
   `;
 }
 
+export interface FusedWellSideOpts extends FusedBaseOpts {
+  relationship: SpatialRelationship;
+  wellSide: 'anchor' | 'target';
+}
+
+// Well hydration without IRI inlining. Re-derives the well set inside the same
+// fused query body (which already applies the region + well-category filters via
+// bindEntityInCell), then projects geometry + attributes from the well variable.
+// Replaces buildWellsByIri (templates/hydrate.ts): statewide well sets are ~20k+
+// IRIs and inlining them as VALUES makes the request body exceed hydrologykg's
+// ~1MB limit (413). Server-deriving keeps the request ~1KB. Runs on federation.
+export function buildFusedWellQuery(opts: FusedWellSideOpts): string {
+  const body = buildFusedWhereBody({
+    anchor: opts.anchor,
+    target: opts.target,
+    anchorRegion: opts.anchorRegion,
+    targetRegion: opts.targetRegion,
+    mode: relationshipMode(opts.relationship),
+    hops: opts.relationship.hops,
+  });
+  const suffix = opts.wellSide === 'anchor' ? 'A' : 'C';
+  const wellVar = `?well${suffix}`;
+  const s2Var = opts.wellSide === 'anchor' ? '?s2anchor' : '?s2target';
+
+  // Projecting only ?s2cell (not the anchor cell) collapses the near-join
+  // fan-out to one row per well/cell — parity with the old buildWellsByIri.
+  return `
+    ${PREFIXES}
+    SELECT DISTINCT
+      (${wellVar} AS ?well) ?wellWKT (${s2Var} AS ?s2cell)
+      ?wellName ?meUse ?meWellType ?meDepth ?meOverburden
+      ?ilOwner ?ilDepth ?ilPurpose ?ilYield
+    WHERE {
+      ${body}
+      ${wellVar} geo:hasGeometry/geo:asWKT ?wellWKT .
+      OPTIONAL { ${wellVar} rdfs:label ?wellName . }
+      OPTIONAL { ${wellVar} me_mgs:hasUse ?meUse . }
+      OPTIONAL { ${wellVar} me_mgs:ofWellType ?meWellType . }
+      OPTIONAL { ${wellVar} me_mgs:wellDepth/qudt:numericValue ?meDepth . }
+      OPTIONAL { ${wellVar} me_mgs:wellOverburden/qudt:numericValue ?meOverburden . }
+      OPTIONAL { ${wellVar} il_isgs:hasOwner ?ilOwner . }
+      OPTIONAL { ${wellVar} il_isgs:wellDepth/qudt:numericValue ?ilDepth . }
+      OPTIONAL { ${wellVar} il_isgs:wellPurpose ?ilPurpose . }
+      OPTIONAL { ${wellVar} il_isgs:wellYield/qudt:numericValue ?ilYield . }
+    }
+  `;
+}
+
 // Per-observation sample-detail query, server-derived. Inner subquery picks
 // out sample IRIs via the same fused anchor→target logic; outer joins to
 // observation/sample/result tuples and projects detail fields. Replaces
