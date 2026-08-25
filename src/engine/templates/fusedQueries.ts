@@ -2,6 +2,7 @@ import { PREFIXES } from '../../constants/prefixes';
 import type {
   EntityBlock,
   FacilityFilters,
+  StreamFilters,
   WellFilters,
   SpatialRelationship,
 } from '../../types/query';
@@ -20,6 +21,8 @@ export function entityIriVar(block: EntityBlock, suffix: string): string {
       return `?waterBody${suffix}`;
     case 'wells':
       return `?well${suffix}`;
+    case 'streams':
+      return `?stream${suffix}`;
   }
 }
 
@@ -86,7 +89,20 @@ export function bindEntityInCell(block: EntityBlock, s2Var: string, suffix: stri
       return `${s2Var} spatial:connectedTo ?well${suffix} .
       ${typeFilter}`;
     }
+    case 'streams': {
+      return `${s2Var} spatial:connectedTo ?stream${suffix} .
+      ?stream${suffix} rdf:type hyf:HY_FlowPath .
+      ${streamFtypeFilter(block.streamFilters, suffix)}`;
+    }
   }
+}
+
+// FTYPE restriction for flowlines, shared by the s2-hop and direct-bind forms.
+function streamFtypeFilter(filters: StreamFilters | undefined, suffix: string): string {
+  if (!filters?.ftypes?.length) return '';
+  const values = filters.ftypes.map((f) => `"${f}"`).join(' ');
+  return `?stream${suffix} nhdplusv2:hasFTYPE ?flFtype${suffix} .
+      VALUES ?flFtype${suffix} { ${values} }`;
 }
 
 function regionClause(regionCodes: string[] | undefined, s2Var: string, internalVar: string): string {
@@ -122,6 +138,45 @@ function neighborPath(hops: number, fromVar: string, toVar: string): string {
 interface FusedBodyOpts extends FusedBaseOpts {
   mode: 'near' | 'downstream' | 'upstream';
   hops?: number;
+  maxDistanceKm?: number;
+}
+
+// Wraps the hydrology trace in a cumulative-length cutoff. The seed block is
+// duplicated inside so the closure stays anchored — without it the aggregate
+// runs over the whole national flowline graph.
+//
+// Membership semantics: a flowline qualifies if *some* seed reaches it within
+// the cutoff, matching GROUP BY (seed, end) with no MIN. The per-flowline
+// number shown in popups is computed separately in buildFusedFlowlineQuery /
+// buildStreamsByIri, where MIN() picks the shortest qualifying path.
+function boundedTrace(
+  seed: string,
+  direction: 'downstream' | 'upstream',
+  maxDistanceKm: number,
+): string {
+  const trace =
+    direction === 'downstream'
+      ? `?upstream_flowline hyf:downstreamFlowPathTC ?_flMid .
+                ?_flMid hyf:downstreamFlowPathTC ?ds_flowline .`
+      : `?ds_flowline hyf:downstreamFlowPathTC ?_flMid .
+                ?_flMid hyf:downstreamFlowPathTC ?upstream_flowline .`;
+
+  return `{
+        SELECT DISTINCT ?upstream_flowline ?ds_flowline WHERE {
+          {
+            SELECT ?upstream_flowline ?ds_flowline (SUM(?_flLen) AS ?_plen) WHERE {
+              {
+                SELECT ?upstream_flowline ?_flMid ?ds_flowline WHERE {
+                  { SELECT DISTINCT ?upstream_flowline WHERE { ${seed} } }
+                  ${trace}
+                }
+              }
+              ?_flMid nhdplusv2:hasFlowPathLength/qudt:quantityValue/qudt:numericValue ?_flLen .
+            } GROUP BY ?upstream_flowline ?ds_flowline
+          }
+          FILTER (xsd:float(?_plen) < xsd:float(${maxDistanceKm}))
+        }
+      }`;
 }
 
 // Returns just the inner WHERE-body patterns shared across all fused queries:
@@ -144,22 +199,41 @@ function buildFusedWhereBody(opts: FusedBodyOpts): string {
       ${targetBind}`;
   }
 
-  const traceTriple =
-    opts.mode === 'downstream'
-      ? `?upstream_flowline hyf:downstreamFlowPathTC ?ds_flowline .`
-      : `?ds_flowline hyf:downstreamFlowPathTC ?upstream_flowline .`;
-
-  return `?s2anchor rdf:type kwg-ont:S2Cell_Level13 .
+  const seed = `?s2anchor rdf:type kwg-ont:S2Cell_Level13 .
       ${aRegion}
       ${anchorBind}
       ?s2anchor kwg-ont:sfTouches | owl:sameAs ?s2neighbor .
       ?s2neighbor spatial:connectedTo ?upstream_flowline .
-      ?upstream_flowline rdf:type hyf:HY_FlowPath .
-      ${traceTriple}
-      ?s2target spatial:connectedTo ?ds_flowline ;
+      ?upstream_flowline rdf:type hyf:HY_FlowPath .`;
+
+  const trace = opts.maxDistanceKm
+    ? boundedTrace(seed, opts.mode, opts.maxDistanceKm)
+    : opts.mode === 'downstream'
+      ? `?upstream_flowline hyf:downstreamFlowPathTC ?ds_flowline .`
+      : `?ds_flowline hyf:downstreamFlowPathTC ?upstream_flowline .`;
+
+  // When the target *is* a flowline, the traced ?ds_flowline already is the
+  // answer — the s2target hop would find any flowline sharing a cell with it.
+  // The cell is still needed if the target carries a region filter.
+  const targetPart =
+    opts.target.type === 'streams'
+      ? `${
+          tRegion
+            ? `?s2target spatial:connectedTo ?ds_flowline ;
+                rdf:type kwg-ont:S2Cell_Level13 .
+      ${tRegion}`
+            : ''
+        }
+      BIND(?ds_flowline AS ?streamC)
+      ${streamFtypeFilter(opts.target.streamFilters, 'C')}`
+      : `?s2target spatial:connectedTo ?ds_flowline ;
                 rdf:type kwg-ont:S2Cell_Level13 .
       ${tRegion}
       ${targetBind}`;
+
+  return `${seed}
+      ${trace}
+      ${targetPart}`;
 }
 
 function relationshipMode(
@@ -209,6 +283,7 @@ export function buildFusedNearQuery(opts: FusedNearOpts): string {
 export interface FusedHydrologyOpts extends FusedBaseOpts {
   direction: 'downstream' | 'upstream';
   project: 'anchor' | 'target';
+  maxDistanceKm?: number;
 }
 
 // Server-side downstream/upstream query.
@@ -219,6 +294,7 @@ export function buildFusedHydrologyQuery(opts: FusedHydrologyOpts): string {
     anchorRegion: opts.anchorRegion,
     targetRegion: opts.targetRegion,
     mode: opts.direction,
+    maxDistanceKm: opts.maxDistanceKm,
   });
   const projectVar =
     opts.project === 'anchor'
@@ -252,6 +328,7 @@ export function buildFusedSampleAggregateQuery(opts: FusedSampleSideOpts): strin
     targetRegion: opts.targetRegion,
     mode: relationshipMode(opts.relationship),
     hops: opts.relationship.hops,
+    maxDistanceKm: opts.relationship.maxDistanceKm,
   });
   const suffix = opts.sampleSide === 'anchor' ? 'A' : 'C';
   const s2Var = opts.sampleSide === 'anchor' ? '?s2anchor' : '?s2target';
@@ -291,6 +368,7 @@ export function buildFusedSampleDetailsQuery(opts: FusedSampleSideOpts): string 
     targetRegion: opts.targetRegion,
     mode: relationshipMode(opts.relationship),
     hops: opts.relationship.hops,
+    maxDistanceKm: opts.relationship.maxDistanceKm,
   });
   const suffix = opts.sampleSide === 'anchor' ? 'A' : 'C';
   const spVar = `?sp${suffix}`;
@@ -353,6 +431,7 @@ export interface FusedFlowlineOpts {
   anchor: EntityBlock;
   direction: 'downstream' | 'upstream';
   anchorIris: string[];
+  maxDistanceKm?: number;
 }
 
 // Returns flowline geometries traced from the anchor entities the pipeline
@@ -375,6 +454,15 @@ export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
     .map(wrapUri)
     .join(' ')} }`;
 
+  const seedCells = `{
+        SELECT DISTINCT ?s2cellus WHERE {
+          ${anchorValues}
+          ?s2anchor rdf:type kwg-ont:S2Cell_Level13 .
+          ${anchorBind}
+          ?s2anchor kwg-ont:sfTouches | owl:sameAs ?s2cellus .
+        }
+      }`;
+
   const flowlinePattern =
     opts.direction === 'downstream'
       ? `?upstream_flowline rdf:type hyf:HY_FlowPath ;
@@ -384,18 +472,54 @@ export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
             spatial:connectedTo ?s2cellus .
         ?flowline hyf:downstreamFlowPathTC ?downstream_flowline .`;
 
-  return `
+  // Unbounded: the flowline set is the plain transitive closure.
+  if (!opts.maxDistanceKm) {
+    return `
     ${PREFIXES}
     SELECT DISTINCT ?flowline ?flowlineWKT ?fl_type ?streamName WHERE {
-      {
-        SELECT DISTINCT ?s2cellus WHERE {
-          ${anchorValues}
-          ?s2anchor rdf:type kwg-ont:S2Cell_Level13 .
-          ${anchorBind}
-          ?s2anchor kwg-ont:sfTouches | owl:sameAs ?s2cellus .
-        }
-      }
+      ${seedCells}
       ${flowlinePattern}
+      ?flowline geo:hasGeometry/geo:asWKT ?flowlineWKT ;
+                nhdplusv2:hasFTYPE ?fl_type .
+      OPTIONAL { ?flowline rdfs:label ?streamName }
+    }
+  `;
+  }
+
+  // Bounded: sum the lengths of the segments between seed and candidate, then
+  // MIN across seeds so each flowline carries one distance for its popup.
+  const boundedTraceInner =
+    opts.direction === 'downstream'
+      ? `?_flSeed hyf:downstreamFlowPathTC ?_flMid .
+                  ?_flMid hyf:downstreamFlowPathTC ?flowline .`
+      : `?flowline hyf:downstreamFlowPathTC ?_flMid .
+                  ?_flMid hyf:downstreamFlowPathTC ?_flSeed .`;
+
+  return `
+    ${PREFIXES}
+    SELECT DISTINCT ?flowline ?flowlineWKT ?fl_type ?streamName ?path_length WHERE {
+      {
+        SELECT ?flowline (MIN(?_plen) AS ?path_length) WHERE {
+          {
+            SELECT ?_flSeed ?flowline (SUM(?_flLen) AS ?_plen) WHERE {
+              {
+                SELECT ?_flSeed ?_flMid ?flowline WHERE {
+                  {
+                    SELECT DISTINCT ?_flSeed WHERE {
+                      ${seedCells}
+                      ?_flSeed rdf:type hyf:HY_FlowPath ;
+                               spatial:connectedTo ?s2cellus .
+                    }
+                  }
+                  ${boundedTraceInner}
+                }
+              }
+              ?_flMid nhdplusv2:hasFlowPathLength/qudt:quantityValue/qudt:numericValue ?_flLen .
+            } GROUP BY ?_flSeed ?flowline
+          }
+          FILTER (xsd:float(?_plen) < xsd:float(${opts.maxDistanceKm}))
+        } GROUP BY ?flowline
+      }
       ?flowline geo:hasGeometry/geo:asWKT ?flowlineWKT ;
                 nhdplusv2:hasFTYPE ?fl_type .
       OPTIONAL { ?flowline rdfs:label ?streamName }
