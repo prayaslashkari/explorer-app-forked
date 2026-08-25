@@ -5,7 +5,8 @@
 // 30 km): the notebook returns 162 flowlines, but only because it requires
 // schema1:address on facilities — a predicate 13 of 144 NH airport facilities
 // have. Without that accidental filter its answer is 1,547 flowlines, and ours
-// is a superset of exactly that set (we also expand to neighbouring S2 cells).
+// is a superset of exactly that set (we also expand to neighbouring S2 cells
+// and add the "+1" segment past the cutoff).
 //
 // Run: node scripts/flow-distance-check.mjs
 import assert from 'node:assert/strict';
@@ -79,6 +80,13 @@ const streams = ctx.targetIris.length;
 const facilities = ctx.anchorIris.length;
 console.log(`\n${streams} streams within 30 km downstream of ${facilities} NH airport facilities`);
 
+// The "+1" fringe must land past the cutoff, so some flowlines carry a
+// distance above the threshold — that is the point of it.
+const overThreshold = (ctx.results['GET_FLOWLINE_GEOMETRIES'] ?? [])
+  .concat(ctx.results['HYDRATE_TARGET_BY_IRI'] ?? [])
+  .filter((r) => r.path_length !== undefined && Number(r.path_length) >= 30);
+console.log(`${overThreshold.length} flowlines past the 30 km cutoff (the "+1" fringe)`);
+
 // The bound has to actually bind: unbounded, this trace runs to the coast.
 const unbounded = planPipeline({ ...question, relationship: { type: 'downstream' } });
 const unboundedRows = await run(unbounded[0].endpoint, unbounded[0].buildQuery(ctx));
@@ -87,9 +95,9 @@ console.log(`${unboundedStreams} streams with no distance bound`);
 
 assert.ok(streams > 1547, `expected a superset of the notebook's 1547, got ${streams}`);
 // The bound must actually exclude flowlines the unbounded trace reaches.
-// Observed 2026-08: 2757 bounded vs 3490 unbounded — downstreamFlowPathTC in
-// this KG does not reach as far as the coast, so the gap is smaller than the
-// notebook's parameters suggest.
+// Observed 2026-08: 2784 bounded (2757 within the cutoff + 27 fringe) vs 3490
+// unbounded — downstreamFlowPathTC in this KG does not reach as far as the
+// coast, so the gap is smaller than the notebook's parameters suggest.
 assert.ok(
   unboundedStreams > streams,
   `bound had no effect: ${streams} bounded vs ${unboundedStreams} unbounded`,

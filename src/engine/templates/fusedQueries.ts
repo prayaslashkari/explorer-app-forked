@@ -141,6 +141,25 @@ interface FusedBodyOpts extends FusedBaseOpts {
   maxDistanceKm?: number;
 }
 
+// Extends the trace one flowline past the cutoff ("+1"). The budget runs out at
+// whatever segment happens to fit, which is an artifact of how NHDPlus split
+// the river rather than a real feature — without this the drawn path stops
+// mid-channel. Matches David's second UC1-CQ2c notebook, where the total
+// flowpath may deliberately exceed the threshold.
+//
+// The zero-or-one path yields the endpoint itself *and* its immediate
+// neighbour in one triple. A UNION would express the same thing, but QLever —
+// which the notebooks run against — returns unbound results for MIN() over a
+// variable bound inside a UNION, so the path form keeps this portable across
+// both hosts. Note the direction flip: downstream extends past the downstream
+// end, upstream past the upstream end. hyf:downstreamFlowPath has no TC, so
+// it is one segment.
+function fringePath(direction: 'downstream' | 'upstream', endVar: string, outVar: string): string {
+  return direction === 'downstream'
+    ? `${endVar} hyf:downstreamFlowPath? ${outVar} .`
+    : `${outVar} hyf:downstreamFlowPath? ${endVar} .`;
+}
+
 // Wraps the hydrology trace in a cumulative-length cutoff. The seed block is
 // duplicated inside so the closure stays anchored — without it the aggregate
 // runs over the whole national flowline graph.
@@ -157,24 +176,25 @@ function boundedTrace(
   const trace =
     direction === 'downstream'
       ? `?upstream_flowline hyf:downstreamFlowPathTC ?_flMid .
-                ?_flMid hyf:downstreamFlowPathTC ?ds_flowline .`
-      : `?ds_flowline hyf:downstreamFlowPathTC ?_flMid .
+                ?_flMid hyf:downstreamFlowPathTC ?_flEnd .`
+      : `?_flEnd hyf:downstreamFlowPathTC ?_flMid .
                 ?_flMid hyf:downstreamFlowPathTC ?upstream_flowline .`;
 
   return `{
         SELECT DISTINCT ?upstream_flowline ?ds_flowline WHERE {
           {
-            SELECT ?upstream_flowline ?ds_flowline (SUM(?_flLen) AS ?_plen) WHERE {
+            SELECT ?upstream_flowline ?_flEnd (SUM(?_flLen) AS ?_plen) WHERE {
               {
-                SELECT ?upstream_flowline ?_flMid ?ds_flowline WHERE {
+                SELECT ?upstream_flowline ?_flMid ?_flEnd WHERE {
                   { SELECT DISTINCT ?upstream_flowline WHERE { ${seed} } }
                   ${trace}
                 }
               }
               ?_flMid nhdplusv2:hasFlowPathLength/qudt:quantityValue/qudt:numericValue ?_flLen .
-            } GROUP BY ?upstream_flowline ?ds_flowline
+            } GROUP BY ?upstream_flowline ?_flEnd
           }
           FILTER (xsd:float(?_plen) < xsd:float(${maxDistanceKm}))
+          ${fringePath(direction, '?_flEnd', '?ds_flowline')}
         }
       }`;
 }
@@ -491,19 +511,25 @@ export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
   const boundedTraceInner =
     opts.direction === 'downstream'
       ? `?_flSeed hyf:downstreamFlowPathTC ?_flMid .
-                  ?_flMid hyf:downstreamFlowPathTC ?flowline .`
-      : `?flowline hyf:downstreamFlowPathTC ?_flMid .
+                  ?_flMid hyf:downstreamFlowPathTC ?_flEnd .`
+      : `?_flEnd hyf:downstreamFlowPathTC ?_flMid .
                   ?_flMid hyf:downstreamFlowPathTC ?_flSeed .`;
 
+  // The "+1" segment lies past the cutoff, so it can't reuse its parent's
+  // distance — that would report a number under the threshold for a flowline
+  // outside it. Adding the parent's own length gives the distance to where the
+  // fringe segment starts, which never understates. A flowline that is both a
+  // valid endpoint (via one seed) and a fringe (via another) keeps the smaller
+  // value, since MIN runs over the union.
   return `
     ${PREFIXES}
     SELECT DISTINCT ?flowline ?flowlineWKT ?fl_type ?streamName ?path_length WHERE {
       {
-        SELECT ?flowline (MIN(?_plen) AS ?path_length) WHERE {
+        SELECT ?flowline (MIN(?_ptotal) AS ?path_length) WHERE {
           {
-            SELECT ?_flSeed ?flowline (SUM(?_flLen) AS ?_plen) WHERE {
+            SELECT ?_flSeed ?_flEnd (SUM(?_flLen) AS ?_plen) WHERE {
               {
-                SELECT ?_flSeed ?_flMid ?flowline WHERE {
+                SELECT ?_flSeed ?_flMid ?_flEnd WHERE {
                   {
                     SELECT DISTINCT ?_flSeed WHERE {
                       ${seedCells}
@@ -515,9 +541,13 @@ export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
                 }
               }
               ?_flMid nhdplusv2:hasFlowPathLength/qudt:quantityValue/qudt:numericValue ?_flLen .
-            } GROUP BY ?_flSeed ?flowline
+            } GROUP BY ?_flSeed ?_flEnd
           }
           FILTER (xsd:float(?_plen) < xsd:float(${opts.maxDistanceKm}))
+          ?_flEnd nhdplusv2:hasFlowPathLength/qudt:quantityValue/qudt:numericValue ?_endLen .
+          ${fringePath(opts.direction, '?_flEnd', '?flowline')}
+          BIND(IF(?flowline = ?_flEnd, 0.0, ?_endLen) AS ?_extra)
+          BIND(xsd:float(?_plen) + xsd:float(?_extra) AS ?_ptotal)
         } GROUP BY ?flowline
       }
       ?flowline geo:hasGeometry/geo:asWKT ?flowlineWKT ;
