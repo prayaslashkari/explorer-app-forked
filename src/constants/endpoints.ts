@@ -1,9 +1,9 @@
 export const ENDPOINTS = {
-  sawgraph: 'https://frink.apps.renci.org/sawgraph/sparql',
-  fiokg: 'https://frink.apps.renci.org/fiokg/sparql',
-  spatialkg: 'https://frink.apps.renci.org/spatialkg/sparql',
-  hydrologykg: 'https://frink.apps.renci.org/hydrologykg/sparql',
-  federation: 'https://frink.apps.renci.org/federation/sparql',
+  sawgraph: 'https://apps.okn.us/sawgraph/sparql',
+  fiokg: 'https://apps.okn.us/fiokg/sparql',
+  spatialkg: 'https://apps.okn.us/spatialkg/sparql',
+  hydrologykg: 'https://apps.okn.us/hydrologykg/sparql',
+  federation: 'https://apps.okn.us/federation/sparql',
 } as const;
 
 export type EndpointKey = keyof typeof ENDPOINTS;

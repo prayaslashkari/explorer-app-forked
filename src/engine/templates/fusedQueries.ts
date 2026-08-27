@@ -352,15 +352,28 @@ export function buildFusedSampleDetailsQuery(opts: FusedSampleSideOpts): string 
 export interface FusedFlowlineOpts {
   anchor: EntityBlock;
   direction: 'downstream' | 'upstream';
-  anchorRegion?: string[];
+  anchorIris: string[];
 }
 
-// Re-derives anchor S2 cells via inner subquery and returns flowline
-// geometries reachable from those cells in the chosen direction. Avoids
-// shipping intermediate S2 cell URIs across the wire.
+// Returns flowline geometries traced from the anchor entities the pipeline
+// already resolved in FIND_ANCHOR_IRIS.
+//
+// Those IRIs are the answer set: each one passed both the anchor-side and
+// target-side filters. Re-deriving anchors here instead — the previous
+// approach — meant guessing which region to apply, and either guess is wrong.
+// With no region the trace starts from every matching facility in the country
+// and the layer covers the USA; with the target's region it drops anchors that
+// sit outside the region but genuinely drain into it (for "samples in Maine
+// downstream of landfills", 16 of 39 contributing landfills are outside Maine),
+// leaving sample points with no stream under them. Binding the resolved IRIs
+// removes the guess and keeps this layer consistent with the facility layer.
 export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
   const anchorBind = bindEntityInCell(opts.anchor, '?s2anchor', 'A');
-  const anchorRegionClause = regionClause(opts.anchorRegion, '?s2anchor', '?_regionA');
+  // ponytail: inlined as VALUES rather than re-derived. Anchor sets are small
+  // (tens), unlike the sample IRI lists that forced server-side fusion.
+  const anchorValues = `VALUES ${entityIriVar(opts.anchor, 'A')} { ${opts.anchorIris
+    .map(wrapUri)
+    .join(' ')} }`;
 
   const flowlinePattern =
     opts.direction === 'downstream'
@@ -376,8 +389,8 @@ export function buildFusedFlowlineQuery(opts: FusedFlowlineOpts): string {
     SELECT DISTINCT ?flowline ?flowlineWKT ?fl_type ?streamName WHERE {
       {
         SELECT DISTINCT ?s2cellus WHERE {
+          ${anchorValues}
           ?s2anchor rdf:type kwg-ont:S2Cell_Level13 .
-          ${anchorRegionClause}
           ${anchorBind}
           ?s2anchor kwg-ont:sfTouches | owl:sameAs ?s2cellus .
         }
