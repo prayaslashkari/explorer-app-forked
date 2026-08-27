@@ -56,7 +56,7 @@ Supported relationships: **near** (~1–2 km), **downstream**, **upstream**
 
 ## SPARQL endpoints
 
-All hosted at `frink.apps.renci.org`:
+All hosted at `apps.okn.us`:
 
 | Endpoint      | Used for                                        |
 | ------------- | ----------------------------------------------- |
