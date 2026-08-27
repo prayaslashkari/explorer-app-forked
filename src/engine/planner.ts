@@ -175,11 +175,12 @@ function buildFusedSteps(question: AnalysisQuestion): PipelineStep[] {
       type: 'GET_FLOWLINE_GEOMETRIES',
       endpoint: 'federation',
       description: `Loading ${relationship.type} stream geometries`,
-      buildQuery: () =>
+      // Runs after FIND_ANCHOR_IRIS so it can trace from the resolved anchors.
+      buildQuery: (ctx) =>
         buildFusedFlowlineQuery({
           anchor: anchorBlock,
           direction: relationship.type === 'downstream' ? 'downstream' : 'upstream',
-          anchorRegion: anchorRegionOpt,
+          anchorIris: ctx.anchorIris,
         }),
     });
   }
