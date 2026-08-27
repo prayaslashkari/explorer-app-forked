@@ -696,7 +696,7 @@ console.log(results);
 
 Copy a query from the console, run it at:
 ```
-https://frink.apps.renci.org/fiokg/sparql
+https://apps.okn.us/fiokg/sparql
 ```
 
 ### 4. Check S2 Cell Counts
