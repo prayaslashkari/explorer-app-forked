@@ -61,7 +61,7 @@ live endpoints.
 
 ## SPARQL endpoints
 
-All hosted at `frink.apps.renci.org`:
+All hosted at `apps.okn.us`:
 
 | Endpoint      | Used for                                        |
 | ------------- | ----------------------------------------------- |
